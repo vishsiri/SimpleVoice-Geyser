@@ -6,27 +6,17 @@ project: simplevoicegeyser
 
 # Protocol Reference
 
-This page documents the 0.1.2-3 websocket client/server packet flow. It covers the browser web UI and native Android app protocol used by Simple Voice Geyser, not the internal Simple Voice Chat protocol.
+This page documents the MineDream web client and plugin packet flow, not the internal Simple Voice Chat protocol. Legacy browser and native Android authentication are intentionally unsupported.
 
 ## Connection
 
-The browser connects to the websocket endpoint relative to the loaded web UI path:
+The browser connects to the fixed websocket endpoint on the Voice Chat origin:
 
 ```text
-ws://host[:port]/ws
-wss://host[:port]/ws
+wss://voicechat.minedream.city/ws
 ```
 
-When the web UI is served from a subpath, the websocket URL is resolved relative to that subpath.
-
-Examples:
-
-| Web UI URL                   | Websocket URL                |
-|------------------------------|------------------------------|
-| `https://voice.example.com/` | `wss://voice.example.com/ws` |
-| `https://example.com/svg/`   | `wss://example.com/svg/ws`   |
-
-Use `wss://` for public deployments. Browsers may restrict microphone access on insecure contexts.
+The Webshop serves every normal page and asset request. Only `/ws` is routed to the plugin's private Jetty listener. Public deployments require HTTPS/WSS for microphone access and transport security.
 
 ## Message Types
 
@@ -39,103 +29,38 @@ The protocol uses two websocket message classes:
 | Client to server | Binary        | Microphone audio                                          |
 | Server to client | Binary        | Receive audio, either legacy PCM or `svg-v2` framed audio |
 
-## Join Form And Join Packets
+## MineDream SSO join
 
-The browser web UI and Android app both collect:
-
-| Field      | Meaning                                                  |
-|------------|----------------------------------------------------------|
-| `username` | Bedrock username or server-recognized player name        |
-| `password` | Voice password configured through `/svg pswd [password]` |
-
-Compatibility validation runs before username/password authentication.
-
-### Web Join
-
-Browser assets are served by the plugin build, so web joins identify the built-in client and include the exact generated build id:
+The external Webshop client obtains an opaque, short-lived, single-use ticket. It sends no username, password, Webshop access token, refresh token, or API key to the websocket.
 
 ```json
 {
   "type": "join",
-  "username": "PlayerName",
-  "password": "password-value",
+  "ticket": "<single-use-ticket>",
   "clientType": {
-    "type": "Web",
-    "serverVersion": "<SvgCore.VERSION>",
-    "serverBuild": "<SvgCore.BUILD_ID>"
+    "type": "MineDreamWeb",
+    "serverVersion": "1",
+    "serverBuild": "1"
   }
 }
 ```
 
-For transition compatibility, legacy browser joins with top-level `build` are still accepted:
-
-```json
-{
-  "type": "join",
-  "username": "PlayerName",
-  "password": "password-value",
-  "build": "<SvgCore.BUILD_ID>"
-}
-```
-
-In both forms, the browser build value is validated exactly against `SvgCore.BUILD_ID`.
-
-### Svg-App Join
-
-Native Android app releases are independent from plugin commit hashes, so Svg-App joins target the project/server version instead of the browser build id:
-
-```json
-{
-  "type": "join",
-  "username": "PlayerName",
-  "password": "password-value",
-  "clientType": {
-    "type": "Svg-App",
-    "serverVersion": "<SvgCore.VERSION>"
-  }
-}
-```
-
-Client type fields:
-
-| Field                      | Meaning                                      | Validation                                          |
-|----------------------------|----------------------------------------------|-----------------------------------------------------|
-| `clientType.type`          | Client family identifier.                    | Required string. Supported values: `Web`, `Svg-App`. |
-| `clientType.serverVersion` | Project/server version targeted by client.  | Required string for structured client joins.        |
-| `clientType.serverBuild`   | Browser build id targeted by built-in Web.   | Required for `Web`; optional for `Svg-App`.          |
-
-`clientType` is independent from `svg-v2` audio framing. It describes the app/server websocket compatibility contract as a whole; `svg-v2` is only one negotiated server-to-client audio transport after authentication.
-
-### Client Type Filtering
-
-Server owners can optionally block or allow client types:
-
-```yaml
-client:
-  allowedTypes:
-    isBlackList: true
-    list: []
-```
-
-When `isBlackList` is `true`, listed client types are rejected. When `false`, only listed client types are accepted. The default blocks nothing.
+`clientType`, `serverVersion`, and `serverBuild` are exact, fixed protocol values. There is no legacy browser, username/password, or `Svg-App` fallback in this fork.
 
 Validation order:
 
-| Condition                                            | Result                                                                 |
-|------------------------------------------------------|------------------------------------------------------------------------|
-| No `clientType` and no old `client` object            | Run legacy browser `build` validation.                                 |
-| Missing or outdated browser build                    | Server sends an error and closes with `4008` / `update_required`.      |
-| `clientType` is not an object                        | Server sends an error and closes with `4005` / `invalid_client_info`.  |
-| Missing or blank `clientType.type`                   | Server sends an error and closes with `4005` / `invalid_client_info`.  |
-| Unknown or config-blocked `clientType.type`          | Server sends an error and closes with `4005` / `unsupported_client_type`. |
-| `Web` has missing or outdated `serverBuild`          | Server sends an error and closes with `4008` / `update_required`.      |
-| `Svg-App` has missing or mismatched `serverVersion`  | Server sends an error and closes with `4008` / `app_protocol_unsupported`. |
-| Old Android `client.kind/version/protocol` metadata  | Server sends an error and closes with `4005` / `invalid_client_info`.  |
-| Invalid username/password                            | Server sends an error after compatibility succeeds.                    |
-| Player is not allowed to use the web voice bridge    | Server sends an error after compatibility succeeds.                    |
-| Successful authentication                            | Server creates the voice bridge connection and sends a status message. |
+| Condition | Result |
+|-----------|--------|
+| WebSocket Origin does not exactly match the configured HTTPS origin | HTTP 403 before websocket creation. |
+| Missing or malformed `clientType` | Close `4005` / `invalid_client_info`. |
+| Client type is not `MineDreamWeb` | Close `4005` / `unsupported_client_type`. |
+| Protocol version/build is not `1` | Close `4008` / `update_required`. |
+| Ticket is missing or malformed | Close `4005` / `authentication_failed`. |
+| Ticket API times out, returns non-2xx, or returns malformed identity data | Close `4005` / `authentication_failed`. |
+| Returned UUID is not currently online or cannot use the bridge | Close `4005` / `authentication_failed`. |
+| Successful authentication | Create the voice bridge connection and send a status message. |
 
-The server stores validated client identity for diagnostics, but it must not log passwords or complete join packets.
+The plugin consumes the ticket asynchronously through `POST /api/voice-sso/tickets/consume` with its server-only `x-voice-api-key`. Tickets, API keys, response bodies, and complete join packets must never be logged.
 
 Successful join response:
 
@@ -268,13 +193,13 @@ Known close reasons used by compatibility validation:
 | Code   | Reason                       | Meaning                                                   |
 |--------|------------------------------|-----------------------------------------------------------|
 | `4005` | `invalid_client_info`        | Client type metadata is malformed or incomplete.          |
-| `4005` | `unsupported_client_type`    | The client type is unknown or blocked by config.          |
-| `4008` | `update_required`            | Browser build id is missing or stale.                     |
-| `4008` | `app_protocol_unsupported`   | Svg-App targets an unsupported server version.            |
+| `4005` | `unsupported_client_type`    | The client type is not `MineDreamWeb`.                    |
+| `4005` | `authentication_failed`      | Ticket or live-player validation failed.                  |
+| `4008` | `update_required`            | MineDream protocol version/build is unsupported.          |
 
 ## Client To Server Audio
 
-The 0.1.2-3 web client sends microphone audio as binary websocket frames after authentication.
+The MineDream web client sends microphone audio as binary websocket frames after authentication.
 
 Current packet shape:
 
@@ -345,15 +270,11 @@ The current `svg-v2` receive path usually sends Opus payloads with compact spati
 
 ## Local Manual Testing Checklist
 
-- Web join with matching `clientType.serverBuild` joins successfully.
-- Legacy browser join with matching top-level `build` still joins successfully.
-- Web join with missing or stale build is rejected with `4008` / `update_required`.
-- Svg-App join with `clientType.type = "Svg-App"` and matching `serverVersion` reaches normal authentication without browser build.
-- Svg-App wrong password follows the existing authentication failure path.
-- Svg-App server-version mismatch receives `4008` / `app_protocol_unsupported`.
-- Malformed or old Android metadata receives `4005` and does not reach authentication.
-- Client type blacklist and whitelist modes reject the expected client types before authentication.
-- Authenticated Svg-App client sends `capabilities` and receives `capabilities_ack`.
-- Svg-App chat send/receive works after authentication.
-- Svg-App microphone audio still sends PCM16LE frames after join unless a later app version implements `svg-v2` send/receive.
+- Exact `https://voicechat.minedream.city` Origin upgrades; missing or different Origin receives HTTP 403.
+- `MineDreamWeb` protocol version/build `1` reaches ticket consumption.
+- Legacy username/password, `Web`, and `Svg-App` joins are rejected before ticket consumption.
+- Ticket timeout, non-2xx, reuse, malformed UUID, and offline UUID all close with generic `authentication_failed`.
+- A valid ticket for an online UUID joins and cannot be reused.
+- Authenticated MineDream web clients send `capabilities` and receive `capabilities_ack`.
+- Chat and microphone audio continue to work after authentication.
 - Server-to-client legacy and `svg-v2` audio behavior remain unchanged.

@@ -38,6 +38,7 @@ public final class SvgAudioListener {
     private long packetSentStereoSampleCount = 0;
     private long packetMalformedStereoFrameCount = 0;
     private long packetClosedDropCount = 0;
+    private long packetBackpressureDropCount = 0;
     private long attenuationAppliedCount = 0;
     private long attenuationBypassIneligibleGroupCount = 0;
     private long attenuationBypassNoSourceCount = 0;
@@ -91,7 +92,7 @@ public final class SvgAudioListener {
         }
 
         byte[] opusData = soundPacket.getOpusEncodedData();
-        AudioThread.execute(() -> {
+        boolean accepted = AudioThread.tryExecute(() -> {
             if (closed.get() || closing.get()) {
                 packetClosedDropCount++;
                 return;
@@ -179,6 +180,10 @@ public final class SvgAudioListener {
                 logStatsIfNeeded();
             }
         });
+        if (!accepted) {
+            packetBackpressureDropCount++;
+            logStatsIfNeeded();
+        }
     }
 
     private void logStatsIfNeeded() {
@@ -194,6 +199,7 @@ public final class SvgAudioListener {
                         + " sentBytes=" + packetSentByteCount
                         + " malformedStereo=" + packetMalformedStereoFrameCount
                         + " droppedClosed=" + packetClosedDropCount
+                        + " droppedBackpressure=" + packetBackpressureDropCount
                         + " attenuated=" + attenuationAppliedCount
                         + " bypassGroup=" + attenuationBypassIneligibleGroupCount
                         + " bypassNoSource=" + attenuationBypassNoSourceCount

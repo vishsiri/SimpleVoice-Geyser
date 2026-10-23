@@ -3,6 +3,7 @@ package io.github.theodoremeyer.simplevoicegeyser.core.server.servlets;
 import io.github.theodoremeyer.simplevoicegeyser.core.SvgCore;
 import io.github.theodoremeyer.simplevoicegeyser.core.audio.AudioSessionNegotiation;
 import io.github.theodoremeyer.simplevoicegeyser.core.audio.AudioTransportMode;
+import io.github.theodoremeyer.simplevoicegeyser.core.audio.SvgAudioSender;
 import io.github.theodoremeyer.simplevoicegeyser.core.server.connection.ConnectionStates;
 import io.github.theodoremeyer.simplevoicegeyser.core.server.connection.SvgConnection;
 import io.github.theodoremeyer.simplevoicegeyser.core.server.connection.auth.ConnectionAuthenticator;
@@ -14,6 +15,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Class that handles talking to the Client
@@ -29,14 +31,17 @@ public final class JettyWebSocket {
 
     private static final PacketHandler packetHandler = new PacketHandler();
 
-    private Session session;
-    private SvgConnection connection;
+    private volatile Session session;
+    private volatile SvgConnection connection;
     private long binaryFrameCount = 0;
     private long binaryByteCount = 0;
+    private long droppedBinaryFrameCount = 0;
     private long controlMessageCount = 0;
     private long joinAttemptCount = 0;
     private long capabilityMessageCount = 0;
-    private AudioSessionNegotiation audioNegotiation;
+    private volatile AudioSessionNegotiation audioNegotiation;
+    private final AtomicBoolean authenticationPending = new AtomicBoolean();
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     /**
      * No arg Constructor
@@ -67,11 +72,14 @@ public final class JettyWebSocket {
     public void onMessage(String message) {
         controlMessageCount++;
 
-        if (message == null || message.trim().isEmpty()) {
+        if (message == null) {
             return;
         }
 
         message = message.trim();
+        if (message.isEmpty()) {
+            return;
+        }
 
         if (!message.startsWith("{")) {
             sendRaw(ConnectionStates.MessageType.ERROR,
@@ -100,8 +108,16 @@ public final class JettyWebSocket {
      */
     @OnWebSocketMessage
     public void onMessage(byte[] buffer, int offset, int length) {
-        if (connection == null || !connection.isAuthenticated()) {
-            SvgCore.getLogger().debug("WebSocket: Dropping pre-auth binary frame bytes=" + length);
+        SvgConnection currentConnection = connection;
+        if (currentConnection == null || !currentConnection.isAuthenticated()) {
+            logDroppedBinaryFrame(length);
+            return;
+        }
+
+        if (length != SvgAudioSender.PCM_FRAME_BYTES
+                || offset < 0
+                || length > buffer.length - offset) {
+            logDroppedBinaryFrame(length);
             return;
         }
 
@@ -109,16 +125,20 @@ public final class JettyWebSocket {
         binaryByteCount += length;
         if (binaryFrameCount % 100 == 0) {
             SvgCore.getLogger().debug(
-                    "WebSocket: binary stats uuid=" + connection.getUuid()
+                    "WebSocket: binary stats uuid=" + currentConnection.getUuid()
                             + " frames=" + binaryFrameCount
                             + " bytes=" + binaryByteCount
             );
         }
 
-        if (connection.getAudioSender() != null) {
-            connection.getAudioSender().sendOpus(Arrays.copyOfRange(buffer, offset, offset + length));
+        SvgAudioSender audioSender = currentConnection.getAudioSender();
+        if (audioSender != null) {
+            byte[] pcmData = offset == 0 && length == buffer.length
+                    ? buffer
+                    : Arrays.copyOfRange(buffer, offset, offset + length);
+            audioSender.sendOpus(pcmData);
         } else {
-            SvgCore.getLogger().debug("WebSocket: audioSender is null for uuid=" + connection.getUuid() + ", dropping binary frame");
+            SvgCore.getLogger().debug("WebSocket: audioSender is null for uuid=" + currentConnection.getUuid() + ", dropping binary frame");
         }
     }
 
@@ -129,27 +149,30 @@ public final class JettyWebSocket {
      */
     @OnWebSocketClose
     public void onClose(int statusCode, String reason) {
+        closed.set(true);
+        SvgConnection currentConnection = connection;
         SvgCore.getLogger().debug(
                 "WebSocket: Session close status=" + statusCode
                         + " reason=" + reason
-                        + " authenticated=" + (connection != null && connection.isAuthenticated())
+                        + " authenticated=" + (currentConnection != null && currentConnection.isAuthenticated())
                         + " controlMessages=" + controlMessageCount
                         + " binaryFrames=" + binaryFrameCount
+                        + " droppedBinaryFrames=" + droppedBinaryFrameCount
                         + " transport=" + (audioNegotiation == null ? "n/a" : audioNegotiation.summary())
         );
 
-        if (connection != null) {
+        if (currentConnection != null) {
             SvgCore.getLogger().info(
                     "[WebSocket] Closed for "
-                            + connection.getPlayer().getName()
+                            + currentConnection.getPlayer().getName()
                             + ": "
                             + statusCode
                             + " - "
                             + reason
             );
 
-            connection.disconnect(statusCode, reason);
-            SvgCore.getConnectionManager().remove(connection);
+            currentConnection.disconnect(statusCode, reason);
+            SvgCore.getConnectionManager().remove(currentConnection);
         } else {
             SvgCore.getLogger().info("[WebSocket] Closed unknown session: " + reason);
         }
@@ -178,6 +201,15 @@ public final class JettyWebSocket {
 
         SvgCore.getLogger().debug("WebSocket: websocket error", error);
         SvgCore.getLogger().info("[WebSocket] Error: " + type + ": " + message);
+    }
+
+    private void logDroppedBinaryFrame(int length) {
+        droppedBinaryFrameCount++;
+        if (droppedBinaryFrameCount % 100 == 0) {
+            SvgCore.getLogger().debug(
+                    "WebSocket: dropped binary frames=" + droppedBinaryFrameCount + " lastBytes=" + length
+            );
+        }
     }
 
     /**
@@ -250,11 +282,40 @@ public final class JettyWebSocket {
     }
 
     /**
-     * Set the Connection associated with the session
+     * Attach a connection unless this websocket has already closed.
      * @param connection connection
+     * @return whether the connection was attached to an open websocket
      */
-    public void setConnection(SvgConnection connection) {
+    public boolean attachConnection(SvgConnection connection) {
+        if (closed.get()) {
+            return false;
+        }
         this.connection = connection;
+        return !closed.get();
+    }
+
+    /**
+     * Check websocket lifecycle state from asynchronous authentication callbacks.
+     * @return whether the websocket is still open
+     */
+    public boolean isOpen() {
+        Session currentSession = session;
+        return !closed.get() && currentSession != null && currentSession.isOpen();
+    }
+
+    /**
+     * Reserve this socket for one asynchronous ticket-consume attempt.
+     * @return whether the reservation succeeded
+     */
+    public boolean beginAuthentication() {
+        return authenticationPending.compareAndSet(false, true);
+    }
+
+    /**
+     * Release the asynchronous authentication reservation.
+     */
+    public void finishAuthentication() {
+        authenticationPending.set(false);
     }
 
     /**

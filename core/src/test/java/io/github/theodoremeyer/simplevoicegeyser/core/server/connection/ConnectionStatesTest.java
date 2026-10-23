@@ -24,7 +24,7 @@ class ConnectionStatesTest {
                 session.proxy(),
                 new FakePlayer(),
                 null,
-                ClientIdentity.web("0.1.3", "test-build")
+                ClientIdentity.mineDreamWeb()
         );
 
         connection.sendStatus("Connected as Player.");

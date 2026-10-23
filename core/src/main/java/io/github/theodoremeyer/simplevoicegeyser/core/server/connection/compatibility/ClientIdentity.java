@@ -9,23 +9,11 @@ package io.github.theodoremeyer.simplevoicegeyser.core.server.connection.compati
 public record ClientIdentity(String type, String serverVersion, String serverBuild) {
 
     /**
-     * Easy way to create a web client identity
-     * @param serverVersion targeted server version
-     * @param serverBuild targeted server build
-     * @return Identity
+     * Create the only client identity supported by the MineDream fork.
+     * @return MineDream web identity
      */
-    public static ClientIdentity web(String serverVersion, String serverBuild) {
-        return new ClientIdentity("Web", serverVersion, serverBuild);
-    }
-
-    /**
-     * Easy way to create an App client identity
-     * @param serverVersion targeted server version
-     * @param serverBuild targeted server build
-     * @return Identity
-     */
-    public static ClientIdentity svgApp(String serverVersion, String serverBuild) {
-        return new ClientIdentity("Svg-App", serverVersion, serverBuild);
+    public static ClientIdentity mineDreamWeb() {
+        return new ClientIdentity("MineDreamWeb", "1", "1");
     }
 
     /**

@@ -1,40 +1,35 @@
 ---
-title: Flutter Android App Handoff
+title: MineDream Web Client Handoff
 layout: projects
 project: simplevoicegeyser
 ---
 
-# Flutter Android App Handoff: `clientType` Join Update
+# MineDream Web Client Handoff
 
-Update the app websocket join packet to match the plugin's generic client awareness model. Replace the old Android-specific metadata:
+This fork accepts only the Webshop-hosted MineDream web client. Android `Svg-App`, legacy browser, username, and voice-password joins are rejected.
+
+The client must obtain a short-lived ticket from the Webshop SSO flow and send exactly:
 
 ```json
-"client": {
-  "kind": "android",
-  "version": "1.0.0",
-  "protocol": 1
+{
+  "type": "join",
+  "ticket": "<single-use-ticket>",
+  "clientType": {
+    "type": "MineDreamWeb",
+    "serverVersion": "1",
+    "serverBuild": "1"
+  }
 }
 ```
 
-with:
-
-```json
-"clientType": {
-  "type": "Svg-App",
-  "serverVersion": "0.1.3"
-}
-```
-
-Keep the rest of the join packet unchanged: `type: "join"`, `username`, and `password`. Do not include the browser `build` or `serverBuild` fields for the app.
-
-After the connected/authenticated status response, keep sending the existing `capabilities` packet and keep handling `capabilities_ack`. Until the app has a verified `svg-v2` Opus decode/playback path, keep advertising conservative legacy receive support rather than making the app `svg-v2` only.
+Do not send the Minecraft username, Webshop access token, password, or plugin API key through the WebSocket. The public Origin must exactly match `server.sso.allowed-origin`.
 
 Test against the rebuilt plugin jar:
 
-- valid Svg-App join succeeds;
-- wrong password still fails through the normal auth path;
-- old `client.kind/version/protocol` metadata is rejected with `4005 / invalid_client_info`;
-- mismatched `clientType.serverVersion` is rejected with `4008 / app_protocol_unsupported`;
+- a valid unused ticket for the online player's canonical UUID succeeds;
+- replayed, expired, malformed, or mismatched-UUID tickets fail;
+- missing or different Origin is rejected before the WebSocket opens;
+- legacy username/password and `Svg-App` joins fail;
 - capabilities and `capabilities_ack` still work after auth;
 - chat still works;
-- current audio behavior is unchanged.
+- both audio directions work.

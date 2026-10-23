@@ -5,9 +5,6 @@ plugins {
 }
 
 dependencies {
-    // password encryption
-    implementation("org.mindrot:jbcrypt:0.4")
-
     // Json
     // Source: https://mvnrepository.com/artifact/org.json/json
     implementation("org.json:json:20260522")
@@ -33,26 +30,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-}
-
-tasks.processResources {
-    from(sourceSets.main.resources.srcDirs)
-
-    from("web") {
-        into("web")
-
-        filesMatching("*.html") {
-            filter { line ->
-                line.replace(
-                        "@@GIT_COMMIT@@",
-                        currentGitCommit()
-                ).replace(
-                        "@@PROJECT_VERSION@@",
-                        project.version.toString()
-                )
-            }
-        }
-    }
 }
 
 tasks.withType(Jar).configureEach {

@@ -176,12 +176,6 @@ public final class GroupManager {
                     + group.getName() + "' (" + group.getId() + "): " + e.getMessage());
         }
 
-        // Debug getLogger password state
-        SvgCore.getLogger().debug("[GROUPS]: svgPlayer: " + svgPlayer.getName()
-                + " | Group: " + groupName
-                + " | Provided Password: " + password
-                + " | Actual Password: " + groupPassword);
-
         // Handle password check safely
         if (groupPassword != null) {
 

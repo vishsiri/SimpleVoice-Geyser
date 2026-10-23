@@ -8,7 +8,8 @@ If you are hosting your server with a Minecraft hosting provider, please look if
 
 
 ## MineCraft Hosting Provider Guides
-- [Playit]({% project_link guides/playit %})
+
+The MineDream fork uses the Webshop host and its Nginx Proxy Manager `/ws` route. Follow [MineDream SSO installation]({% project_link install/minedream-sso %}); upstream direct-hosting guides do not apply.
 
 ## Don't see a Guide or one needs updating?
 ### Adding via a PR

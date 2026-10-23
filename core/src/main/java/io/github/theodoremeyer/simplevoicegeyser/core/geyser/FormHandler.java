@@ -41,15 +41,13 @@ public final class FormHandler {
         Form form = SimpleForm.builder()
                 .title("Simple Voice Chat (SVG)")
                 .button("Groups")
-                .button("Set Password")
                 .button("Options")
                 .optionalButton("Admin Menu", isAdmin)
                 .validResultHandler(response -> {
                     switch (response.clickedButtonId()) {
                         case 0 -> groups(player);
-                        case 1 -> setPassword(player);
-                        case 2 -> options(player);
-                        case 3 -> adminMenu(player);
+                        case 1 -> options(player);
+                        case 2 -> adminMenu(player);
                     }
                 })
                 .build();
@@ -173,23 +171,6 @@ public final class FormHandler {
                 .build();
 
         GeyserHook.sendForm(player.getUniqueId(), form);
-    }
-
-    /**
-     * Allow a bedrock player to set their password using forms
-     * @param p the player
-     */
-    public void setPassword(SvgPlayer p) {
-        Form form = CustomForm.builder()
-                .title("Set SVG Password")
-                .input("Password (between 8-32 characters)", "password")
-                .validResultHandler((e) -> {
-                    String password = e.next();
-
-                    SvgCore.getPasswordManager().setPassword(p, password);
-                })
-                .build();
-        GeyserHook.sendForm(p.getUniqueId(), form);
     }
 
     /**

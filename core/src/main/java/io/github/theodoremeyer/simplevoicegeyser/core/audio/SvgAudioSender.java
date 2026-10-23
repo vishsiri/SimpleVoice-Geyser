@@ -13,6 +13,9 @@ import java.util.UUID;
  */
 public final class SvgAudioSender {
 
+    /** One 20 ms, 48 kHz, mono PCM16 frame from the web client. */
+    public static final int PCM_FRAME_BYTES = 960 * Short.BYTES;
+
     /**
      * The simple voice chat api
      */
@@ -29,6 +32,7 @@ public final class SvgAudioSender {
      * Audio Encoder to encode the audio for svc
      */
     private final OpusEncoder encoder;
+    private boolean closed;
 
     /**
      * Class Constructor. Creates and registers the audio sender
@@ -38,7 +42,6 @@ public final class SvgAudioSender {
     public SvgAudioSender(VoicechatServerApi serverApi, UUID playerUuid) {
         this.serverApi = serverApi;
         this.playerUuid = playerUuid;
-        this.encoder = serverApi.createEncoder();
 
         VoicechatConnection connection = serverApi.getConnectionOf(playerUuid);
 
@@ -46,67 +49,92 @@ public final class SvgAudioSender {
             throw new RuntimeException("no svc connection for uuid: " + playerUuid);
         }
 
-        this.delegate = serverApi.createAudioSender(connection); //create the sender itself
-        boolean success = serverApi.registerAudioSender(delegate);
-
-        if (success) {
+        OpusEncoder createdEncoder = serverApi.createEncoder();
+        AudioSender createdDelegate = null;
+        try {
+            createdDelegate = serverApi.createAudioSender(connection);
+            if (!serverApi.registerAudioSender(createdDelegate)) {
+                throw new IllegalStateException("Failed to register audio sender for: " + playerUuid);
+            }
             connection.setConnected(true);
             connection.setDisabled(false);
-        } else {
-            SvgCore.getLogger().info("Failed to register SvgAudioSender for UUID: " + playerUuid);
+        } catch (RuntimeException exception) {
+            closeEncoder(createdEncoder);
+            if (createdDelegate != null) {
+                try {
+                    serverApi.unregisterAudioSender(createdDelegate);
+                } catch (Exception ignored) {
+                }
+            }
+            throw exception;
         }
+        this.encoder = createdEncoder;
+        this.delegate = createdDelegate;
     }
 
     /**
      * Sends Opus-encoded audio to the player if conditions are met.
      * @param pcmData data to send for player
      */
-    public void sendOpus(byte[] pcmData) {
+    public synchronized void sendOpus(byte[] pcmData) {
+        if (closed || pcmData == null || pcmData.length != PCM_FRAME_BYTES) {
+            return;
+        }
 
-        SvgCore.getLogger().debug( "AudioSender: received audio data from websocket!");
-
-        //AudioThread.execute(() -> {
-
-            byte[] encoded;
-            try {
-                short[] pcmShorts = serverApi.getAudioConverter().bytesToShorts(pcmData);
-                if (pcmShorts.length != 960) {
-                    SvgCore.getLogger().warning(
-                            "[AudioSender] Invalid frame size: " + pcmShorts.length + " (expected 960)"
-                    );
-                    return;
-                }
-
-                encoded = encoder.encode(pcmShorts); // PCM to Opus encoded
-                if (encoded == null || encoded.length == 0) {
-                    SvgCore.getLogger().warning("[AudioSender] Encoder returned empty data for: " + playerUuid);
-                    return;
-                }
-            } catch (Exception e) {
-                SvgCore.getLogger().debug("AudioSender: Encoding failed for " + playerUuid, e);
+        byte[] encoded;
+        try {
+            short[] pcmShorts = serverApi.getAudioConverter().bytesToShorts(pcmData);
+            if (pcmShorts.length != 960) {
+                SvgCore.getLogger().warning(
+                        "[AudioSender] Invalid frame size: " + pcmShorts.length + " (expected 960)"
+                );
                 return;
             }
 
-            boolean success = delegate.send(encoded);
-            if (!success) {
-                SvgCore.getLogger().warning("[AudioSender] Failed to send audio for: " + playerUuid);
+            encoded = encoder.encode(pcmShorts); // PCM to Opus encoded
+            if (encoded == null || encoded.length == 0) {
+                SvgCore.getLogger().warning("[AudioSender] Encoder returned empty data for: " + playerUuid);
+                return;
             }
-        //});
+        } catch (Exception e) {
+            SvgCore.getLogger().debug("AudioSender: Encoding failed for " + playerUuid, e);
+            return;
+        }
+
+        boolean success = delegate.send(encoded);
+        if (!success) {
+            SvgCore.getLogger().warning("[AudioSender] Failed to send audio for: " + playerUuid);
+        }
     }
 
     /**
      * Closes the AudioSender, and ends decoder
      */
-    public void unregister() {
+    public synchronized void unregister() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+
         try {
-            if (encoder != null) {
-                encoder.resetState();
-                encoder.close();
-            }
+            encoder.resetState();
+            encoder.close();
         } catch (Exception e) {
             SvgCore.getLogger().warning("[SvgAudioSender] Failed to close encoder for " + playerUuid + ": " + e.getMessage());
         }
-        delegate.reset();
-        serverApi.unregisterAudioSender(delegate); //end sender
+        try {
+            delegate.reset();
+            serverApi.unregisterAudioSender(delegate);
+        } catch (Exception e) {
+            SvgCore.getLogger().debug("SvgAudioSender: Failed to unregister sender for " + playerUuid, e);
+        }
+    }
+
+    private static void closeEncoder(OpusEncoder encoder) {
+        try {
+            encoder.resetState();
+            encoder.close();
+        } catch (Exception ignored) {
+        }
     }
 }

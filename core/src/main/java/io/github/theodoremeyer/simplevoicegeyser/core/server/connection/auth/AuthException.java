@@ -12,4 +12,13 @@ public class AuthException extends IllegalStateException {
     public AuthException(String message) {
         super(message);
     }
+
+    /**
+     * create the exception
+     * @param message message
+     * @param cause root cause
+     */
+    public AuthException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

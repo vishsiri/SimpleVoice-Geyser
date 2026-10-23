@@ -88,9 +88,8 @@ client:
      # Default: provided below
      # The text svg sends when a player joins
      text:
-       - "This Server Uses SimpleVoice-Geyser."
-       - "To set it up, run /svg pswd [password],"
-       - "Then join Via the server's SVG website."
+       - "This server uses MineDream Voice Chat."
+       - "Open https://voicechat.minedream.city and sign in with your MineDream account."
 
    # default: true
    # Allows for the bedrock client to open a menu just by opening the emotes menu
@@ -124,30 +123,20 @@ server:
    # port server will run on.
    port: 8080
 
-   # default: 0.0.0.0
-   # Address server binds to, use 127.0.0.1 to only connect from host device.
-   # This is suggested to be changed only if you are running a proxy on the same network/device as the server to allow https/wss.
-   bind-address: 0.0.0.0
+   # default: 127.0.0.1
+   # Keep Jetty private. Use a private interface only when the reverse proxy is on another host.
+   bind-address: 127.0.0.1
    
    # default: /
-   # This is the context-path, or where the root of the server will be generated.
-   # Example: /svg will generate the server at https://yourdomain.com/svg/
+   # Context path containing the websocket endpoint.
+   # Example: /svg exposes the websocket at /svg/ws.
    context-path: /
    
-   security:
-     
-     # default: 5
-     # This is the number of failed login attempts before the server will block the user for auth-lock-duration.
-     max-auth-failures: 5
-     
-     # default: 3
-     # How long each failure is saved for in minutes. 
-     # Example: if set to 3, and max-auth-failures is 5, auth can fail 4 times in 3 minutes before being locked out.
-     auth-fail-duration: 3
-
-     # default: 8
-     # This is the lockout in minutes when max-auth-failures has been reached.
-     auth-lock-duration: 8
+   sso:
+     api-base-url: "https://api.minedream.city"
+     api-key: "replace-with-at-least-32-characters"
+     allowed-origin: "https://voicechat.minedream.city"
+     request-timeout-ms: 5000
    
    # See more at https://theodoremeyer.github.io/projects/simplevoicegeyser/install/audio-transport/
    audio:
@@ -182,14 +171,15 @@ config-version: 0.1.3
 * `useEmoteForSVG` may conflict with Geyser’s off-hand emote setting
 * `bind-address` controls network exposure:
 
-   * `0.0.0.0` → accessible externally
-   * `127.0.0.1` → local only
+   * `127.0.0.1` → local reverse proxy only (recommended)
+   * private interface IP → reverse proxy on the same private network
+   * `0.0.0.0` → every interface; avoid unless the firewall limits ingress to the proxy
 
 ---
 
 ## Networking & Security
 
-Simple Voice Geyser uses a web-based client over HTTP/WebSocket.
+MineDream serves the browser client over HTTPS and proxies only WSS `/ws` to Jetty.
 
 ### Important:
 

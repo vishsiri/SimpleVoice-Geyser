@@ -60,6 +60,9 @@ public final class SvgConnection {
         if (authenticated) {
             return;
         }
+        if (closed) {
+            throw new AuthException("Connection is closed");
+        }
 
         VoicechatServerApi api = SvgCore.getBridge().getVcServerApi();
         if (api == null) {
@@ -75,13 +78,22 @@ public final class SvgConnection {
             throw new AuthException("Player has Simple Voice Chat mod installed");
         }
 
-        audioListener = new SvgAudioListener(uuid, session, api, audioNegotiation);
-        if (!audioListener.registerListener()) {
-            audioListener = null;
+        SvgAudioListener listener = new SvgAudioListener(uuid, session, api, audioNegotiation);
+        if (!listener.registerListener()) {
+            listener.unRegister();
             throw new AuthException("Failed to register audio listener for: " + uuid);
         }
 
-        audioSender = new SvgAudioSender(api, uuid);
+        SvgAudioSender sender;
+        try {
+            sender = new SvgAudioSender(api, uuid);
+        } catch (RuntimeException exception) {
+            listener.unRegister();
+            throw new AuthException("Failed to register audio sender for: " + uuid, exception);
+        }
+
+        audioListener = listener;
+        audioSender = sender;
         authenticated = true;
 
         SvgCore.getLogger().debug(

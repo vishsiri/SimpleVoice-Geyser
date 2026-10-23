@@ -7,7 +7,6 @@ import io.github.theodoremeyer.simplevoicegeyser.core.api.data.SvgConfig;
 import io.github.theodoremeyer.simplevoicegeyser.core.audio.AudioByteCompiler;
 import io.github.theodoremeyer.simplevoicegeyser.core.audio.AudioThread;
 import io.github.theodoremeyer.simplevoicegeyser.core.commands.Command;
-import io.github.theodoremeyer.simplevoicegeyser.core.data.PlayerVcPswd;
 import io.github.theodoremeyer.simplevoicegeyser.core.geyser.GeyserEventHook;
 import io.github.theodoremeyer.simplevoicegeyser.core.geyser.GeyserHook;
 import io.github.theodoremeyer.simplevoicegeyser.core.managers.GroupManager;
@@ -15,6 +14,7 @@ import io.github.theodoremeyer.simplevoicegeyser.core.managers.JoinMessageHandle
 import io.github.theodoremeyer.simplevoicegeyser.core.managers.PlayerManager;
 import io.github.theodoremeyer.simplevoicegeyser.core.server.JettyServer;
 import io.github.theodoremeyer.simplevoicegeyser.core.server.connection.ConnectionManager;
+import io.github.theodoremeyer.simplevoicegeyser.core.server.connection.auth.MineDreamSsoClient;
 import io.github.theodoremeyer.simplevoicegeyser.core.svc.VoiceChatBridge;
 import io.github.theodoremeyer.simplevoicegeyser.core.update.UpdateChecker;
 
@@ -51,7 +51,7 @@ public final class SvgCore {
     private JettyServer jettyServer;
     private final PlayerManager playerManager;
     private GroupManager groupManager;
-    private PlayerVcPswd playerVcPswd;
+    private MineDreamSsoClient ssoClient;
     private final JoinMessageHandler joinMessageHandler;
     private Command command;
     private final AudioByteCompiler audioByteCompiler;
@@ -102,7 +102,11 @@ public final class SvgCore {
 
             getLogger().info("client.vctimeout is currently documented but inactive in this dev build.");
 
-            this.playerVcPswd = new PlayerVcPswd(this);
+            this.ssoClient = new MineDreamSsoClient(
+                    getConfig().SSO_API_BASE_URL.get(),
+                    getConfig().SSO_API_KEY.get(),
+                    getConfig().SSO_REQUEST_TIMEOUT_MS.get()
+            );
 
             int port = getConfig().PORT.get();
             String host = getConfig().BIND_ADDRESS.get();
@@ -181,12 +185,9 @@ public final class SvgCore {
 
         AudioThread.shutdown();
 
-        if (playerVcPswd != null) {
-            playerVcPswd.shutdown();
-        }
-
         vcBridge = null;
         jettyServer = null;
+        ssoClient = null;
         groupManager = null;
         command = null;
     }
@@ -224,11 +225,15 @@ public final class SvgCore {
     }
 
     /**
-     * Get the Password Manager
-     * @return password manager
+     * Get the MineDream SSO client.
+     * @return configured SSO client
      */
-    public static PlayerVcPswd getPasswordManager() {
-        return getInstance().playerVcPswd;
+    public static MineDreamSsoClient getSsoClient() {
+        MineDreamSsoClient client = getInstance().ssoClient;
+        if (client == null) {
+            throw new IllegalStateException("MineDream SSO is not initialized");
+        }
+        return client;
     }
 
     /**

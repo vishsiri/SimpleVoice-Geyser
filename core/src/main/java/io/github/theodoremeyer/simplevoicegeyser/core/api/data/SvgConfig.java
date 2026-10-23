@@ -47,12 +47,6 @@ public final class SvgConfig {
     public final ConfigKey<Boolean> USE_EMOTE =
             new ConfigKey <>(this, "client.useEmoteForSVG", true);
 
-    public final ConfigKey<Boolean> CLIENT_ALLOWED_TYPES_BLACKLIST =
-            new ConfigKey<>(this, "client.allowedTypes.isBlackList", true);
-
-    public final ConfigKey<List<String>> CLIENT_ALLOWED_TYPES_LIST =
-            new ConfigKey<>(this, "client.allowedTypes.list", List.of());
-
     public final ConfigKey<Boolean> WEB_CHAT_ENABLED =
             new ConfigKey<>(this, "client.web-chat-enabled", true);
 
@@ -61,9 +55,8 @@ public final class SvgConfig {
 
     public final ConfigKey<List<String>> JOIN_MESSAGE_TEXT =
             new ConfigKey<>(this, "client.join-message.text", List.of(
-                    "This Server Uses SimpleVoice-Geyser.",
-                    "To set it up, run /svg pswd [password],",
-                    "Then join Via the server's SVG website."
+                    "This server uses MineDream Voice Chat.",
+                    "Open https://voicechat.minedream.city and sign in with your MineDream account."
             ));
 
     public final ConfigKey<Boolean> DEFAULT_GROUP_ENABLED =
@@ -79,19 +72,22 @@ public final class SvgConfig {
             new ConfigKey <>(this, "server.port", 8080);
 
     public final ConfigKey<String> BIND_ADDRESS =
-            new ConfigKey <>(this, "server.bind-address", "0.0.0.0");
+            new ConfigKey <>(this, "server.bind-address", "127.0.0.1");
 
     public final ConfigKey<String> CONTEXT_PATH =
             new ConfigKey <>(this, "server.context-path", "/");
 
-    public final ConfigKey<Integer> MAX_AUTH_FAILURES =
-            new ConfigKey <>(this, "server.security.max-auth-failures", 5);
+    public final ConfigKey<String> SSO_API_BASE_URL =
+            new ConfigKey<>(this, "server.sso.api-base-url", "");
 
-    public final ConfigKey<Integer> AUTH_FAILURE_DURATION =
-            new ConfigKey <>(this, "server.security.auth-fail-duration", 3);
+    public final ConfigKey<String> SSO_API_KEY =
+            new ConfigKey<>(this, "server.sso.api-key", "");
 
-    public final ConfigKey<Integer> AUTH_LOCK_DURATION =
-            new ConfigKey <>(this, "server.security.auth-lock-duration", 8);
+    public final ConfigKey<String> SSO_ALLOWED_ORIGIN =
+            new ConfigKey<>(this, "server.sso.allowed-origin", "https://voicechat.minedream.city");
+
+    public final ConfigKey<Integer> SSO_REQUEST_TIMEOUT_MS =
+            new ConfigKey<>(this, "server.sso.request-timeout-ms", 5000);
 
     public final ConfigKey<String> AUDIO_TRANSPORT_MODE =
             new ConfigKey <>(this, "server.audio.transport-mode", "svg-v2");
@@ -115,17 +111,18 @@ public final class SvgConfig {
             REQUIRE_BEDROCK,
             USE_EMOTE,
             WEB_CHAT_ENABLED,
-            CLIENT_ALLOWED_TYPES_BLACKLIST,
-            CLIENT_ALLOWED_TYPES_LIST,
+            JOIN_MESSAGE_ENABLED,
+            JOIN_MESSAGE_TEXT,
             DEFAULT_GROUP_ENABLED,
             DEFAULT_GROUP_PASSWORD,
             DEFAULT_GROUP_FORCE_ON_WEB_JOIN,
             PORT,
             BIND_ADDRESS,
             CONTEXT_PATH,
-            AUTH_FAILURE_DURATION,
-            AUTH_LOCK_DURATION,
-            MAX_AUTH_FAILURES,
+            SSO_API_BASE_URL,
+            SSO_API_KEY,
+            SSO_ALLOWED_ORIGIN,
+            SSO_REQUEST_TIMEOUT_MS,
             AUDIO_TRANSPORT_MODE,
             AUDIO_ALLOW_LEGACY_FALLBACK,
             DEBUG,

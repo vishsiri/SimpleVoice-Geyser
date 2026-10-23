@@ -17,29 +17,6 @@ All commands use the base command: `/svg`
 
 ---
 
-## /svg pswd
-
-Sets your personal voice chat password.
-
-### Usage
-
-```
-/svg pswd <new-password>
-```
-
-### Details
-
-* Must be executed by a player
-* Password length must be between 8 and 32 characters
-* Used for authentication on the web client
-
-### NOTE
-- On Spigot, the 'confirm' arg is required after the password to set it.
-- If the password is not confirmed, the command will fail and the player will be notified.
-- If the password is not set in the args, SVG will try to open Geyser Forms Password for the player (if they are bedrock)
-
----
-
 ## /svg cgroup
 
 Creates a new voice group.

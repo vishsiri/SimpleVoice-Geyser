@@ -46,17 +46,9 @@ Optional:
 
 ## To Join
 
-1. Run:
-
-   ```
-   /svg pswd <password>
-   ```
-
-   See more at [Commands]({% project_link commands %}).
-
-2. Open the provided web link from your server operator.
-
-3. Connect and start talking.
+1. Join the MineDream Minecraft server with your linked Minecraft account.
+2. Open `https://voicechat.minedream.city` and sign in with your MineDream account.
+3. Connect and start talking. The single-use voice ticket is handled automatically.
 
 See more at [Joining]({% project_link joining %}).
 

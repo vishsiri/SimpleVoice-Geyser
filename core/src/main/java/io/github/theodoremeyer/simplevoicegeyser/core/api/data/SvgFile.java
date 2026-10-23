@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * The DataStore fow holding passwords
+ * Platform-neutral configuration file access.
  * Can be JSON, yml, sqlite, etc
  */
 public abstract class SvgFile {

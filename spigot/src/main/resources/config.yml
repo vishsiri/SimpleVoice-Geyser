@@ -31,23 +31,8 @@ client:
     # Default: provided below
     # The text svg sends when a player joins
     text:
-      - "This Server Uses SimpleVoice-Geyser."
-      - "To set it up, run /svg pswd [password],"
-      - "Then join Via the server's SVG website."
-
-
-  allowedTypes:
-
-    # default: true
-    # When true, listed client types are blocked. When false, only listed client types are allowed.
-    isBlackList: true
-
-    # default: no client types listed
-    # Client type names to use with the blacklist/whitelist mode above.
-    # Uncomment one or both entries below when using blacklist/whitelist mode.
-    list:
-      # - Web
-      # - Svg-App
+      - "This server uses MineDream Voice Chat."
+      - "Open https://voicechat.minedream.city and sign in with your MineDream account."
 
 server:
 
@@ -72,13 +57,20 @@ server:
   # Port server will run on.
   port: 8080
 
-  # default: 0.0.0.0
-  # Address server binds to; use 127.0.0.1 to only allow host-local access.
-  bind-address: 0.0.0.0
+  # default: 127.0.0.1
+  # Keep Jetty private. Use a private interface only when the reverse proxy is on another host.
+  bind-address: 127.0.0.1
 
   # default: /
-  # Context path for hosting SVG web UI behind proxies/subpaths.
+  # Context path containing the /ws endpoint.
   context-path: /
+
+  # MineDream Webshop SSO. The plugin refuses to start without a secure API URL and key.
+  sso:
+    api-base-url: ""
+    api-key: ""
+    allowed-origin: "https://voicechat.minedream.city"
+    request-timeout-ms: 5000
 
   audio:
 

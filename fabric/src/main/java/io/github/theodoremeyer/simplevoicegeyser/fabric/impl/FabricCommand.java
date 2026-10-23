@@ -42,16 +42,6 @@ public class FabricCommand {
                                 .executes(ctx -> execute(ctx, "lgroup"))
                         )
 
-                        // /svg pswd <password>
-                        .then(literal("pswd")
-                                .then(argument("password", StringArgumentType.word())
-                                        .executes(ctx -> {
-                                            String password = StringArgumentType.getString(ctx, "password");
-                                            return execute(ctx, "pswd", args -> args.put("password", password));
-                                        })
-                                )
-                        )
-
                         // /svg jgroup <name> [password]
                         .then(literal("jgroup")
                                 .then(argument("name", StringArgumentType.word())

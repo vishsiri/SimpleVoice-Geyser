@@ -35,7 +35,6 @@ public final class Command {
     public Command(GroupManager groupManager, SvgCore core) {
         this.formHandler = GeyserHook.getFormHandler();
 
-        register(new PswdCommand());
         register(new CreateGroupCommand(groupManager));
         register(new JoinGroupCommand(groupManager));
         register(new LeaveGroupCommand(groupManager));

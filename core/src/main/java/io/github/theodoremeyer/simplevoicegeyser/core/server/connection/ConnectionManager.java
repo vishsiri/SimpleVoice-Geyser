@@ -39,7 +39,8 @@ public final class ConnectionManager {
             ClientIdentity clientIdentity
     ) {
 
-        SvgConnection oldConnection = connections.remove(player.getUniqueId());
+        SvgConnection connection = new SvgConnection(session, player, audioNegotiation, clientIdentity);
+        SvgConnection oldConnection = connections.put(player.getUniqueId(), connection);
 
         if (oldConnection != null) {
             SvgCore.getLogger().debug(
@@ -51,9 +52,6 @@ public final class ConnectionManager {
                     "Replaced by new session"
             );
         }
-
-        SvgConnection connection = new SvgConnection(session, player, audioNegotiation, clientIdentity);
-        connections.put(player.getUniqueId(), connection);
 
         SvgCore.getLogger().info(
                 "[ConnectionManager] Connected: " + player.getName() + " (" + player.getUniqueId() + ")"
@@ -100,8 +98,7 @@ public final class ConnectionManager {
             return;
         }
 
-        UUID uuid = connection.getUuid();
-        connections.computeIfPresent(uuid, (ignored, current) -> current != connection ? current : null);
+        connections.remove(connection.getUuid(), connection);
     }
 
     /**

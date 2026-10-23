@@ -36,9 +36,6 @@ public final class HelpCommand implements SubCommand {
         sender.sendMessage(SvgCore.getPrefix() + SvgColor.AQUA + " " + SvgColor.BOLD + "Commands");
         sender.sendMessage(SvgColor.GRAY + "----------------------------------");
 
-        sender.sendMessage(SvgColor.YELLOW + "/svg pswd <password> "
-                + SvgColor.GRAY + "- Set your voice chat password");
-
         sender.sendMessage(SvgColor.YELLOW + "/svg cgroup -name <name> [-t type] [-p password] [-ps] "
                 + SvgColor.GRAY + "- Create a voice chat svg");
 
